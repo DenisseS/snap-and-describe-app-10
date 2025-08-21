@@ -317,8 +317,10 @@ class SessionService {
   // Logout
   logout (): void {
     this.tokenManager.clearToken();
-    // Clear ALL session cache on logout
+    // Clear ALL session cache on logout including shopping lists for security
     this.clearLocalCache("DROPBOX_FILE_");
+    this.clearLocalCache("LOCAL_");
+    console.log('🔐 SessionService: Cleared all local data including shopping lists for security');
   }
 }
 

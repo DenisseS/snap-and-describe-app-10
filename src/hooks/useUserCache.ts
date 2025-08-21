@@ -20,9 +20,10 @@ export const useUserCache = () => {
     const userKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.USER_PREFIX);
     const dropboxKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.DROPBOX_PREFIX);
     const prefKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.PREF_PREFIX);
+    const localKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.LOCAL_PREFIX);
     
-    const totalRemoved = userKeysRemoved + dropboxKeysRemoved + prefKeysRemoved;
-    console.log(`🗑️ Total user cache keys removed: ${totalRemoved}`);
+    const totalRemoved = userKeysRemoved + dropboxKeysRemoved + prefKeysRemoved + localKeysRemoved;
+    console.log(`🗑️ Total user cache keys removed: ${totalRemoved} (including ${localKeysRemoved} shopping lists)`);
     return totalRemoved;
   };
 
@@ -36,7 +37,8 @@ export const useUserCache = () => {
     return keys.some(key => 
       key.startsWith(CACHE_PREFIXES.USER_PREFIX) || 
       key.startsWith(CACHE_PREFIXES.DROPBOX_PREFIX) ||
-      key.startsWith(CACHE_PREFIXES.PREF_PREFIX)
+      key.startsWith(CACHE_PREFIXES.PREF_PREFIX) ||
+      key.startsWith(CACHE_PREFIXES.LOCAL_PREFIX)
     );
   };
 
@@ -45,7 +47,8 @@ export const useUserCache = () => {
     const userKeys = keys.filter(key => 
       key.startsWith(CACHE_PREFIXES.USER_PREFIX) || 
       key.startsWith(CACHE_PREFIXES.DROPBOX_PREFIX) ||
-      key.startsWith(CACHE_PREFIXES.PREF_PREFIX)
+      key.startsWith(CACHE_PREFIXES.PREF_PREFIX) ||
+      key.startsWith(CACHE_PREFIXES.LOCAL_PREFIX)
     );
     
     return {
