@@ -78,6 +78,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🔐 Auth: User info loaded successfully', userInfo);
         setUserInfo(userInfo);
         setAuthState(AuthState.AUTHENTICATED);
+        
+        // Merge local shopping lists to remote after successful authentication
+        try {
+          console.log('🔐 Auth: Starting merge of local shopping lists with remote...');
+          const mergeResult = await shoppingListService.mergeLocalListsWithRemote();
+          if (mergeResult.success) {
+            console.log('🔐 Auth: Local shopping lists merged successfully');
+          } else {
+            console.warn('🔐 Auth: Failed to merge local shopping lists');
+          }
+        } catch (error) {
+          console.error('🔐 Auth: Error during shopping lists merge:', error);
+        }
       } else {
         // Si getUserInfo devuelve null pero no lanzó error, probablemente el usuario fue deslogueado
         console.log('🔐 Auth: User info is null, user may have been logged out');
@@ -126,7 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Limpiar datos del servicio
       sessionService.logout();
       
-      // Limpiar cache del usuario (pero NO las shopping lists locales)
+      // Limpiar cache del usuario
       const cacheInfo = getUserCacheInfo();
       console.log('🔐 Auth: Current user cache:', cacheInfo);
       

@@ -317,10 +317,9 @@ class SessionService {
   // Logout
   logout (): void {
     this.tokenManager.clearToken();
-    // Clear ALL session cache on logout including shopping lists for security
+    // Clear ONLY remote cache on logout (LOCAL_ cache should only exist for unauthenticated users)
     this.clearLocalCache("DROPBOX_FILE_");
-    this.clearLocalCache("LOCAL_");
-    console.log('🔐 SessionService: Cleared all local data including shopping lists for security');
+    console.log('🔐 SessionService: Cleared remote cache on logout');
   }
 }
 

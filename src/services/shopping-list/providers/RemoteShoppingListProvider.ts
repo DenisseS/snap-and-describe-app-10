@@ -11,64 +11,32 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
     super(sessionService);
   }
 
-  // Nueva implementación con sync
+  // Nueva implementación con sync usando DROPBOX_FILE_ cache (no LOCAL_)
   protected async getListsDetails(): Promise<{ lists: Record<string, ShoppingList> }> {
-    // Primero intentar cache local
-    const localData = this.sessionService.getLocalFile(SHOPPING_LIST_CACHE_KEYS.LOCAL_SHOPPING_LISTS);
-
-    if (localData) {
-      console.log('🛒 RemoteProvider: Using local cache for lists metadata');
-      return localData;
-    }
-
-    // Si no hay cache local, cargar de remoto con sync
     console.log('🛒 RemoteProvider: Loading lists metadata from remote with sync');
     const result = await this.sessionService.getFile(SHOPPING_LIST_CACHE_KEYS.REMOTE_SHOPPING_LISTS_PATH);
     const profileData = result.data || { lists: {} };
 
-    // Guardar en cache local para próximas veces
-    const listsData = { lists: profileData.shoppingLists || {} };
-    this.sessionService.setLocalFile(SHOPPING_LIST_CACHE_KEYS.LOCAL_SHOPPING_LISTS, listsData);
-
-    return listsData;
+    return { lists: profileData.shoppingLists || {} };
   }
 
   private resolveListPath(listId: string): string {
     return `${DROPBOX_APP_FOLDER_PATH}${SHOPPING_LIST_CACHE_KEYS.REMOTE_LIST_PREFIX}${listId}.json`;
   }
 
-  // Update inmediato del cache local + background sync
+  // Update cache remoto + background sync (no LOCAL_)
   protected async saveListsDetails(metadata: { lists: Record<string, ShoppingList> }): Promise<void> {
     console.log('🛒 RemoteProvider: Saving lists metadata optimistically');
 
-    // 1. Update cache local inmediato (igual que LocalProvider)
-    this.sessionService.setLocalFile(SHOPPING_LIST_CACHE_KEYS.LOCAL_SHOPPING_LISTS, metadata);
-
-    // 2. Background sync fire-and-forget
+    // Background sync fire-and-forget (SessionService maneja el cache DROPBOX_FILE_)
     const profileData = { shoppingLists: metadata.lists };
     this.sessionService.updateFile(SHOPPING_LIST_CACHE_KEYS.REMOTE_SHOPPING_LISTS_PATH, profileData);
   }
 
-  // Cache local como fuente de verdad con sync handler
+  // Cache remoto como fuente de verdad con sync handler (no LOCAL_)
   protected async getListData(listId: string): Promise<ShoppingListData | null> {
-    // Primero intentar cache local
-    const localKey = `${SHOPPING_LIST_CACHE_KEYS.LOCAL_LIST_DATA_PREFIX}${listId}`;
-    const localData = this.sessionService.getLocalFile(localKey);
-
-    if (localData) {
-      console.log(`🛒 RemoteProvider: Using local cache for list ${listId}`);
-      return localData;
-    }
-
-    // Si no hay cache local, intentar cargar de remoto
     console.log(`🛒 RemoteProvider: Loading list ${listId} from remote`);
     const result = await this.sessionService.getFile(this.resolveListPath(listId));
-
-    if (result.data) {
-      // Guardar en cache local para próximas veces
-      this.sessionService.setLocalFile(localKey, result.data);
-    }
-
     return result.data;
   }
 
@@ -130,10 +98,8 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
         result.syncHandler(
           (updatedProfileData) => {
             console.log('🛒 RemoteProvider: Lists metadata updated from remote sync');
-            // Actualizar cache local
+            // Notificar a la UI (cache DROPBOX_FILE_ manejado por SessionService)
             const listsData = { lists: updatedProfileData.shoppingLists || {} };
-            this.sessionService.setLocalFile(SHOPPING_LIST_CACHE_KEYS.LOCAL_SHOPPING_LISTS, listsData);
-            // Notificar a la UI
             onUpdate(listsData.lists);
           },
           onSyncStatusChange
@@ -164,29 +130,7 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
         result.syncHandler(
           async (updatedData) => {
             console.log(`🛒 RemoteProvider: List ${listId} updated from remote sync`);
-            const localKey = `${SHOPPING_LIST_CACHE_KEYS.LOCAL_LIST_DATA_PREFIX}${listId}`;
-            const localData = this.sessionService.getLocalFile(localKey);
-
-            const localUpdatedAt = localData?.updatedAt ? new Date(localData.updatedAt).getTime() : 0;
-            const remoteUpdatedAt = updatedData?.updatedAt ? new Date(updatedData.updatedAt).getTime() : 0;
-
-            if (remoteUpdatedAt && localUpdatedAt && remoteUpdatedAt < localUpdatedAt) {
-              console.warn(`🛒 RemoteProvider: Stale remote snapshot detected for ${listId}. Deleting stale remote (best-effort) and re-enqueuing local latest.`);
-              // Best-effort delete (non-blocking)
-              this.sessionService.deleteFile(filePath).catch((err) =>
-                console.error('🛒 RemoteProvider: Error deleting stale remote snapshot:', err)
-              );
-              // Always re-enqueue local latest to overwrite on Dropbox via SW queue
-              if (localData) {
-                QueueClient.getInstance().enqueue('shopping-lists', listId, localData);
-              }
-              // Keep local cache/UI as-is (newer)
-              return;
-            }
-
-            // Remote is newer or local is missing → accept remote, update cache and notify UI
-            this.sessionService.setLocalFile(localKey, updatedData);
-
+            
             // Keep lists metadata counts in sync with the latest snapshot
             try {
               const itemCount = Array.isArray(updatedData.items) ? updatedData.items.length : 0;
@@ -220,26 +164,18 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
     }
   }
 
-  // Update inmediato del cache local + background sync
+  // Update cache remoto + background sync (no LOCAL_)
   protected async saveListData(listId: string, data: ShoppingListData): Promise<void> {
     console.log(`🛒 RemoteProvider: Saving list ${listId} data optimistically`);
 
-    // 1. Update cache local inmediato (igual que LocalProvider)
-    const localKey = `${SHOPPING_LIST_CACHE_KEYS.LOCAL_LIST_DATA_PREFIX}${listId}`;
-    this.sessionService.setLocalFile(localKey, data);
-
-    // 2. Enqueue to Service Worker generic queue (fire-and-forget)
+    // Enqueue to Service Worker generic queue (fire-and-forget)
     QueueClient.getInstance().enqueue('shopping-lists', listId, data);
   }
 
   protected async createListData(listId: string, data: ShoppingListData): Promise<void> {
     console.log(`🛒 RemoteProvider: Creating list ${listId} data optimistically`);
 
-    // 1. Update cache local inmediato (igual que LocalProvider)
-    const localKey = `${SHOPPING_LIST_CACHE_KEYS.LOCAL_LIST_DATA_PREFIX}${listId}`;
-    this.sessionService.setLocalFile(localKey, data);
-
-    // 2. Enqueue to Service Worker generic queue (fire-and-forget)
+    // Enqueue to Service Worker generic queue (fire-and-forget)
     const path = this.resolveListPath(listId);
     await this.sessionService.updateFile(path, data);
   }
@@ -247,11 +183,7 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
   protected async deleteListData(listId: string): Promise<void> {
     console.log(`🛒 RemoteProvider: Deleting list ${listId} optimistically`);
 
-    // 1. Clear cache local inmediato
-    const localKey = `${SHOPPING_LIST_CACHE_KEYS.LOCAL_LIST_DATA_PREFIX}${listId}`;
-    this.sessionService.clearCache(localKey);
-
-    // 2. Background delete
+    // Background delete (cache DROPBOX_FILE_ manejado por SessionService)
     const path = this.resolveListPath(listId);
     await this.sessionService.deleteFile(path);
   }
@@ -263,8 +195,6 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
     try {
       const remoteData = await this.sessionService.forceRemoteFetch(filePath);
       if (remoteData) {
-        const localKey = `${SHOPPING_LIST_CACHE_KEYS.LOCAL_LIST_DATA_PREFIX}${listId}`;
-        this.sessionService.setLocalFile(localKey, remoteData);
 
         // Keep lists metadata counts in sync with the latest snapshot
         try {
@@ -319,6 +249,10 @@ export class RemoteShoppingListProvider extends GenericShoppingListProvider {
           await this.saveListData(listId, localListData);
         }
       }
+
+      // Clear local data after successful merge
+      this.sessionService.clearLocalCache("LOCAL_");
+      console.log('🛒 RemoteProvider: Local shopping lists cleared after successful merge');
 
       console.log('🛒 RemoteProvider: Merge completed successfully');
       return { success: true };

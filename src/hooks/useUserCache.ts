@@ -16,14 +16,13 @@ export const useUserCache = () => {
   };
 
   const clearUserCache = (): number => {
-    console.log('🗑️ Clearing all user cache...');
+    console.log('🗑️ Clearing user-specific cache (not shopping lists)...');
     const userKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.USER_PREFIX);
     const dropboxKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.DROPBOX_PREFIX);
     const prefKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.PREF_PREFIX);
-    const localKeysRemoved = clearCacheByPrefix(CACHE_PREFIXES.LOCAL_PREFIX);
     
-    const totalRemoved = userKeysRemoved + dropboxKeysRemoved + prefKeysRemoved + localKeysRemoved;
-    console.log(`🗑️ Total user cache keys removed: ${totalRemoved} (including ${localKeysRemoved} shopping lists)`);
+    const totalRemoved = userKeysRemoved + dropboxKeysRemoved + prefKeysRemoved;
+    console.log(`🗑️ Total user cache keys removed: ${totalRemoved}`);
     return totalRemoved;
   };
 
@@ -37,8 +36,7 @@ export const useUserCache = () => {
     return keys.some(key => 
       key.startsWith(CACHE_PREFIXES.USER_PREFIX) || 
       key.startsWith(CACHE_PREFIXES.DROPBOX_PREFIX) ||
-      key.startsWith(CACHE_PREFIXES.PREF_PREFIX) ||
-      key.startsWith(CACHE_PREFIXES.LOCAL_PREFIX)
+      key.startsWith(CACHE_PREFIXES.PREF_PREFIX)
     );
   };
 
@@ -47,8 +45,7 @@ export const useUserCache = () => {
     const userKeys = keys.filter(key => 
       key.startsWith(CACHE_PREFIXES.USER_PREFIX) || 
       key.startsWith(CACHE_PREFIXES.DROPBOX_PREFIX) ||
-      key.startsWith(CACHE_PREFIXES.PREF_PREFIX) ||
-      key.startsWith(CACHE_PREFIXES.LOCAL_PREFIX)
+      key.startsWith(CACHE_PREFIXES.PREF_PREFIX)
     );
     
     return {
@@ -58,10 +55,16 @@ export const useUserCache = () => {
     };
   };
 
+  const clearLocalShoppingLists = (): number => {
+    console.log('🗑️ Clearing local shopping lists (for merge or security)...');
+    return clearCacheByPrefix(CACHE_PREFIXES.LOCAL_PREFIX);
+  };
+
   return {
     clearCacheByPrefix,
     clearUserCache,
     clearAppCache,
+    clearLocalShoppingLists,
     hasUserCache,
     getUserCacheInfo,
     CACHE_PREFIXES
