@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { UserProfile, DataState } from '../types/userData';
 import { AuthState } from '../types/auth';
-import { useAuth } from './AuthContext';
+import { useAuthentication } from '../hooks/useAuthentication';
 import UserDataService from '../services/UserDataService';
 import { USER_PROFILE_EVENTS } from '../constants/events';
 
@@ -23,7 +23,15 @@ interface UserDataProviderProps {
 }
 
 export const UserDataProvider: React.FC<UserDataProviderProps> = ({ children }) => {
-  const { authState, userInfo, sessionService } = useAuth();
+  const authContext = useAuthentication();
+  
+  // Early return if auth context is not available yet
+  if (!authContext) {
+    console.log('👤 UserDataProvider: Auth context not available yet, showing children without user data');
+    return <>{children}</>;
+  }
+  
+  const { authState, userInfo, sessionService } = authContext;
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [state, setState] = useState<DataState>(DataState.IDLE);
   
